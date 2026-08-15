@@ -107,9 +107,9 @@ against.
 With MATLAB and this repository's `code/cora` in place (`install_tool.sh v1` does that):
 
 ```bash
-P='{"operation": "matMul", "dim": 100, "device": "cpu"}'
-./prepare_instance.sh v1 zonotope matMul-100d-cpu 100 "$P"
-./run_instance.sh     v1 zonotope matMul-100d-cpu 100 "$P" /tmp/result.csv
+P='{"set": "zonotope", "operation": "matMul", "dim": 100, "device": "cpu", "repetition": 100}'
+./prepare_instance.sh v1 zonotope matMul-100d-cpu "$P"
+./run_instance.sh     v1 zonotope matMul-100d-cpu "$P" /tmp/result.csv
 cat /tmp/result.csv
 ```
 

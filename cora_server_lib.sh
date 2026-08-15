@@ -31,7 +31,7 @@ server_alive() {
     [ -f "$SRV_DIR/server.pid" ] && kill -0 "$(cat "$SRV_DIR/server.pid" 2>/dev/null)" 2>/dev/null
 }
 
-# submit_job TYPE BENCHMARK INSTANCE REPETITION PARAMS RESULT WAIT_TOTAL RELAY
+# submit_job TYPE BENCHMARK INSTANCE PARAMS RESULT WAIT_TOTAL RELAY
 #   Publishes a job, waits up to WAIT_TOTAL seconds for the daemon's `done`, and prints
 #   the job's log. With RELAY=1 the log is tailed live (used by prepare_instance.sh, which
 #   is not timed); with RELAY=0 it is printed once the job is done, so the tail process and
@@ -44,8 +44,8 @@ server_alive() {
 #   Returns: 0 done; 1 could not acquire the lease; 2 timed out (the caller should exit, so
 #   the lease frees and the wedged daemon is torn down).
 submit_job() {
-    local type="$1" benchmark="$2" instance="$3" repetition="$4" params="$5"
-    local result="$6" wait_total="$7" relay="${8:-0}"
+    local type="$1" benchmark="$2" instance="$3" params="$4"
+    local result="$5" wait_total="$6" relay="${7:-0}"
     JOBID="$$-$(date +%s%N)"
 
     # Invariant: prepare_instance.sh / run_instance.sh are the ONLY processes that ever take
@@ -83,7 +83,7 @@ submit_job() {
     : > "$SRV_DIR/job.log"
     { echo "id=$JOBID"; echo "type=$type"; echo "cwd=$(pwd)";
       echo "benchmark=$benchmark"; echo "instance=$instance";
-      echo "repetition=$repetition"; echo "params=$params";
+      echo "params=$params";
       echo "result=$result"; } > "$SRV_DIR/request.tmp"
     mv "$SRV_DIR/request.tmp" "$SRV_DIR/request"
 

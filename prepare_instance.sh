@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # prepare_instance.sh — generate this instance's inputs, before the timed run.
-#   args: v1 <benchmark> <instance> <repetition> <params>
+#   args: v1 <benchmark> <instance> <params>
 #
 # Not timed, which is what makes it the right place for two things:
 #   1. bringing up the CORA background server (lazily on the first instance, restarting it
@@ -17,7 +17,7 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/cora_server_lib.sh"
 
-BENCHMARK="$2"; INSTANCE="$3"; REPETITION="$4"; PARAMS="$5"
+BENCHMARK="$2"; INSTANCE="$3"; PARAMS="$4"
 SERVER_SH="${CORA_SERVER_SH:-$HERE/cora_server.sh}"
 MATLAB_BIN="${CORA_MATLAB:-matlab}"
 START_TIMEOUT="${CORA_START_TIMEOUT:-550}"   # server boot budget; under the harness's 600s prepare cap
@@ -25,15 +25,15 @@ PREP_WAIT="${CORA_PREP_WAIT:-590}"           # wait for the prepare job; under t
 mkdir -p "$SRV_DIR"
 
 # Direct fallback: a plain MATLAB run, paying the full startup. CORA_DIRECT_CMD is a test
-# seam: `<cmd> prepare <benchmark> <instance> <repetition> <params>`.
+# seam: `<cmd> prepare <benchmark> <instance> <params>`.
 direct_prepare() {
     echo "[prepare] no healthy server; preparing directly via MATLAB"
     if [ -n "${CORA_DIRECT_CMD:-}" ]; then
-        $CORA_DIRECT_CMD prepare "$BENCHMARK" "$INSTANCE" "$REPETITION" "$PARAMS"
+        $CORA_DIRECT_CMD prepare "$BENCHMARK" "$INSTANCE" "$PARAMS"
         return $?
     fi
     local b="${BENCHMARK//\'/\'\'}" i="${INSTANCE//\'/\'\'}" p="${PARAMS//\'/\'\'}"
-    "$MATLAB_BIN" -batch "addpath(genpath('$HERE')); r=prepare_instance('$b','$i',$REPETITION,'$p'); exit(double(r));"
+    "$MATLAB_BIN" -batch "addpath(genpath('$HERE')); r=prepare_instance('$b','$i','$p'); exit(double(r));"
 }
 
 ensure_server() {
@@ -76,7 +76,7 @@ if ! ensure_server; then
 fi
 
 # relay=1: this script is not timed, so the daemon's output is tailed live.
-submit_job "prepare" "$BENCHMARK" "$INSTANCE" "$REPETITION" "$PARAMS" \
+submit_job "prepare" "$BENCHMARK" "$INSTANCE" "$PARAMS" \
     "$SRV_DIR/result" "$PREP_WAIT" 1
 case $? in
     0)  rc="$(cat "$SRV_DIR/job_rc" 2>/dev/null || echo 0)"

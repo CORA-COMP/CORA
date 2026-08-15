@@ -1,4 +1,4 @@
-function rc = prepare_instance(benchmark, instance, repetition, params)
+function rc = prepare_instance(benchmark, instance, params)
 % prepare_instance - build this instance's operands, before the timed run.
 %
 %    This step is not timed, which is the whole point of it: for matMul it draws the random
@@ -11,14 +11,13 @@ function rc = prepare_instance(benchmark, instance, repetition, params)
 %    avoids generating operands nothing will read.
 %
 % Syntax:
-%    rc = prepare_instance(benchmark, instance, repetition, params)
+%    rc = prepare_instance(benchmark, instance, params)
 %
 % Inputs:
 %    benchmark  - set representation, e.g. 'zonotope' or 'zonotope-batched'
 %    instance   - '<operation>-<n>d[-b<batch>]-<device>', e.g. 'matMul-500d-cpu'
-%    repetition - how often run_instance repeats the operation (unused here)
-%    params     - JSON object (char) with operation, dim, device and, when batched,
-%                 batch_size
+%    params     - JSON object (char) with everything the tool needs: set, operation, dim,
+%                 device, repetition and, when batched, batch_size
 %
 % Outputs:
 %    rc - 0 on success; nonzero makes the harness skip the instance
@@ -45,12 +44,12 @@ rc = 0;
 try
     p = jsondecode(params);
     n = double(p.dim);
-    cls = aux_class(benchmark);
+    cls = aux_class(p.set);
 
     % CORA's contSet operations are scalar-set and run on double arrays: no gpuArray path,
     % no batched set representation. Those instances are reported `unsupported` by
     % run_instance, so there is nothing to build for them here either.
-    if ~strcmpi(p.device, 'cpu') || endsWith(benchmark, '-batched') || isempty(cls) ...
+    if ~strcmpi(p.device, 'cpu') || isfield(p, 'batch_size') || isempty(cls) ...
             || ~ismember(p.operation, WITH_OPERANDS)
         fprintf('[prepare] %s / %s: nothing to prepare\n', benchmark, instance);
         return
@@ -86,13 +85,12 @@ end
 
 % Auxiliary functions -----------------------------------------------------
 
-function cls = aux_class(benchmark)
-    % The CORA class a benchmark measures; '' for one this submission does not know. The
-    % overhead benchmark is a zonotope, per the catalog. Mirrored in run_instance.m.
-    switch char(erase(string(benchmark), '-batched'))
+function cls = aux_class(setName)
+    % The CORA class a set name means; '' for one this submission does not know. Mirrored
+    % in run_instance.m.
+    switch char(setName)
         case 'interval'; cls = 'interval';
         case 'zonotope'; cls = 'zonotope';
-        case 'test';     cls = 'zonotope';
         otherwise;       cls = '';
     end
 end

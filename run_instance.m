@@ -1,4 +1,4 @@
-function run_instance(benchmark, instance, repetition, params, resultFile)
+function run_instance(benchmark, instance, params, resultFile)
 % run_instance - perform the measured operation and write the verdict.
 %
 %    Everything here is inside the region the harness times, so it stays as thin as it can:
@@ -15,14 +15,13 @@ function run_instance(benchmark, instance, repetition, params, resultFile)
 %    cases to aux_execute, is how this submission grows.
 %
 % Syntax:
-%    run_instance(benchmark, instance, repetition, params, resultFile)
+%    run_instance(benchmark, instance, params, resultFile)
 %
 % Inputs:
 %    benchmark  - set representation, e.g. 'zonotope' or 'zonotope-batched'
 %    instance   - '<operation>-<n>d[-b<batch>]-<device>', e.g. 'matMul-500d-cpu'
-%    repetition - how often to repeat the operation
-%    params     - JSON object (char) with operation, dim, device and, when batched,
-%                 batch_size
+%    params     - JSON object (char) with everything the tool needs: set, operation, dim,
+%                 device, repetition and, when batched, batch_size
 %    resultFile - where to write the verdict (header row + one data row)
 %
 % Outputs:
@@ -49,20 +48,18 @@ WITH_OPERANDS = {'matMul', 'minkSum', 'convHull'};
 verdict = 'error';
 
 try
-    if ischar(repetition) || isstring(repetition)
-        repetition = str2double(repetition);   % the server's file channel passes it as text
-    end
     p = jsondecode(params);
     n = double(p.dim);
-    cls = aux_class(benchmark);
+    repetition = double(p.repetition);
+    cls = aux_class(p.set);
 
     reason = '';
     if ~strcmpi(p.device, 'cpu')
         reason = sprintf('device "%s": CORA has no GPU path for set operations', p.device);
-    elseif endsWith(benchmark, '-batched')
+    elseif isfield(p, 'batch_size')
         reason = 'batched: CORA has no batched set representation';
     elseif isempty(cls)
-        reason = sprintf('unknown benchmark "%s"', benchmark);
+        reason = sprintf('unknown set "%s"', p.set);
     elseif ~ismember(p.operation, OPERATIONS)
         reason = sprintf('unknown operation "%s"', p.operation);
     end
@@ -76,7 +73,7 @@ try
         if ismember(p.operation, WITH_OPERANDS)
             data = load(aux_inputFile(benchmark, instance));
         end
-        aux_execute(p.operation, cls, n, double(repetition), data);
+        aux_execute(p.operation, cls, n, repetition, data);
         verdict = 'finished';
         fprintf('[run] %s / %s: %s x%d on a %s in %dd\n', ...
             benchmark, instance, p.operation, repetition, cls, n);
@@ -124,13 +121,12 @@ function out = aux_execute(operation, cls, n, reps, data)
     end
 end
 
-function cls = aux_class(benchmark)
-    % The CORA class a benchmark measures; '' for one this submission does not know. The
-    % overhead benchmark is a zonotope, per the catalog. Mirrored in prepare_instance.m.
-    switch char(erase(string(benchmark), '-batched'))
+function cls = aux_class(setName)
+    % The CORA class a set name means; '' for one this submission does not know. Mirrored
+    % in prepare_instance.m.
+    switch char(setName)
         case 'interval'; cls = 'interval';
         case 'zonotope'; cls = 'zonotope';
-        case 'test';     cls = 'zonotope';
         otherwise;       cls = '';
     end
 end

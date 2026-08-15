@@ -7,7 +7,7 @@ function cora_server(srvDir)
 %    daemon is therefore started ONCE (by cora_server.sh, which prepare_instance.sh
 %    launches lazily) and then services one job at a time, read as files written by
 %    prepare_instance.sh / run_instance.sh:
-%       type=prepare -> prepare_instance(benchmark,instance,repetition,params)
+%       type=prepare -> prepare_instance(benchmark,instance,params)
 %       type=run     -> run_instance(...,resultFile), which writes the verdict itself
 %
 %    The operands still travel from prepare to run through a .mat file rather than the
@@ -21,7 +21,7 @@ function cora_server(srvDir)
 %    them):
 %       ping     - daemon deletes it and touches `pong` (liveness, when idle)
 %       request  - job spec, key=value lines: id, type, cwd, benchmark, instance,
-%                  repetition, params, result
+%                  params, result
 %       running  - daemon writes <id> while a job is in flight (lease watch)
 %       job.log  - per-job output
 %       result   - verdict file (written by run_instance for a run job)
@@ -87,11 +87,10 @@ function cora_server(srvDir)
                 rng('default');
                 switch job.type
                     case 'prepare'
-                        rc = prepare_instance(job.benchmark, job.instance, ...
-                            job.repetition, job.params);
+                        rc = prepare_instance(job.benchmark, job.instance, job.params);
                     case 'run'
-                        run_instance(job.benchmark, job.instance, job.repetition, ...
-                            job.params, job.result);   % writes job.result itself
+                        run_instance(job.benchmark, job.instance, job.params, ...
+                            job.result);   % writes job.result itself
                     otherwise
                         throw(CORAerror('CORA:specialError', ...
                             sprintf('unknown job type "%s"', job.type)));
@@ -132,7 +131,7 @@ end
 function job = aux_readJob(reqPath)
     % parse the key=value job request file into a job struct
     job = struct('id','', 'type','', 'cwd','', 'benchmark','', 'instance','', ...
-        'repetition','', 'params','', 'result','');
+        'params','', 'result','');
     lines = splitlines(string(fileread(reqPath)));
     for i = 1:numel(lines)
         % split each "key=value" line (a value may itself contain '=')
@@ -146,7 +145,6 @@ function job = aux_readJob(reqPath)
             case "cwd";        job.cwd = char(val);
             case "benchmark";  job.benchmark = char(val);
             case "instance";   job.instance = char(val);
-            case "repetition"; job.repetition = char(val);
             case "params";     job.params = char(val);
             case "result";     job.result = char(val);
         end
