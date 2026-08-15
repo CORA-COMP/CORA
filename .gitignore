@@ -1,0 +1,9 @@
+# MATLAB license file — contains the license number, never commit
+license.lic
+
+# installed by install_tool.sh on the worker
+/code/
+
+# per-instance handover files and local run output
+/inputs/
+*.log
