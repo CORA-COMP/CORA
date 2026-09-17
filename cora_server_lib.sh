@@ -78,7 +78,7 @@ submit_job() {
     flock -w 10 9 || return 1
 
     # We own the channel: clear stale per-job files, then publish the request atomically.
-    # `cwd` is passed so the daemon resolves the same relative inputs/ path as we do.
+    # `cwd` is passed so the daemon runs the job from the same directory as we do.
     rm -f "$SRV_DIR/done" "$SRV_DIR/result" "$SRV_DIR/running" "$SRV_DIR/job_rc"
     : > "$SRV_DIR/job.log"
     { echo "id=$JOBID"; echo "type=$type"; echo "cwd=$(pwd)";

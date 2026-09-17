@@ -4,6 +4,5 @@ license.lic
 # installed by install_tool.sh on the worker
 /code/
 
-# per-instance handover files and local run output
-/inputs/
+# local run output
 *.log

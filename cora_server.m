@@ -10,10 +10,6 @@ function cora_server(srvDir)
 %       type=prepare -> prepare_instance(benchmark,instance,params)
 %       type=run     -> run_instance(...,resultFile), which writes the verdict itself
 %
-%    The operands still travel from prepare to run through a .mat file rather than the
-%    shared workspace, so that the two entry points behave the same here and in the direct
-%    MATLAB fallback — and measure the same thing every other tool does.
-%
 %    It is deliberately UNAWARE of leases and teardown: if the owning *_instance.sh is
 %    killed, the cora_server.sh supervisor kills THIS process for a clean restart.
 %
@@ -79,8 +75,7 @@ function cora_server(srvDir)
             diary(jobLog); diary on;
             rc = 0;
             try
-                % Run each job from the OWNER's cwd (the tool directory), so the relative
-                % inputs/ path of the prepare->run handover resolves the same on both sides.
+                % Run each job from the OWNER's cwd (the tool directory), as a direct run would.
                 if ~isempty(job.cwd) && isfolder(job.cwd); cd(job.cwd); end
                 % Make a warm job behave like a freshly started MATLAB, so instance N does
                 % not inherit instance N-1's random state.

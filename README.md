@@ -12,29 +12,35 @@ MATLAB (see below). `install_tool.sh` clones CORA itself.
 
 | | |
 | --- | --- |
-| Benchmarks | `test`, `interval`, `zonotope` |
-| Operations | `startup`, `generateRandom`, `matMul`, `minkSum`, `convHull` |
-| Devices | `cpu` |
-| Batched | no |
+| Benchmarks | `test`, `interval`, `zonotope`, `interval-batched`, `zonotope-batched` |
+| Operations | `startup`, `generateRandom`, `randPoint`, `supportFunc`, `matMul`, `minkSum`, `contains` |
+| Devices | `cpu`; `gpu` where CORA's set operations run on `gpuArray` data |
+| Batched | yes, as a list of sets |
 
-Everything else in the catalog is reported `unsupported`, and deliberately so — CORA's
-`contSet` operations are scalar-set and run on double arrays. There is no `gpuArray` path
-for them (the GPU support in CORA is in the neural-network layers, not in set arithmetic)
-and no batched set representation. Emulating a batch with a loop would measure something
-the catalog did not ask for and record it as the vectorized path, so `-batched` and `gpu`
-instances report `unsupported` instead. That decision lives in exactly one place, the
-guards at the top of [`run_instance.m`](run_instance.m); widening them, and adding the
-cases to `aux_execute`, is how this submission grows.
+On a gpu instance, the inputs are moved to the GPU before the loop (`zonotope(gpuArray(c),
+gpuArray(G))`) and CORA's own methods run on them, followed by `wait(gpuDevice)` so the
+asynchronous work lands in the measurement. Two cases report `unsupported` there:
+`matMul`, because `gpuArray * contSet` dispatches to gpuArray's `mtimes` rather than
+CORA's, and `contains` on a zonotope, which solves an LP and `linprog` is CPU-only.
 
-The operations map onto CORA directly:
+CORA has no batched set representation, so a batch is a cell array of `batch_size` sets
+and each repetition applies the operation to every set in turn; an unbatched instance is a
+list of one. What is supported is decided in one place, `aux_unsupported` in
+[`run_instance.m`](run_instance.m); narrowing it, and adding the cases to `aux_execute`, is
+how this submission grows.
 
-| Operation | Prepared (untimed) | Measured |
+Everything happens in `run_instance.m`, inside the harness's measurement: generate the
+inputs, move them to the device, run the loop. The operations map onto CORA directly (`S` a random set, with `generators` generators for a zonotope):
+
+| Operation | Inputs (before the loop) | Repeated |
 | --- | --- | --- |
 | `startup` | — | `zonotope(zeros(n,1), eye(n))` |
-| `generateRandom` | — | `<class>.generateRandom('Dimension', n[, 'NrGenerators', n])` |
-| `matMul` | `randn(n)` and a random set | `M * X` |
-| `minkSum` | two random sets | `X + Y` |
-| `convHull` | two random sets | `convHull(X, Y)` |
+| `generateRandom` | — | `<class>.generateRandom('Dimension', n[, 'NrGenerators', m])` |
+| `randPoint` | `S` | `randPoint(S, points, type)` |
+| `supportFunc` | `S`, a random unit `d` | `supportFunc(S, d, type)` |
+| `matMul` | `randn(n)`, `S` | `M * S` |
+| `minkSum` | `S1`, `S2` | `S1 + S2` |
+| `contains` | `S`, `X = randPoint(S, points)` | `contains(S, X)`; anything but all true is an `error` |
 
 ## The background server
 
@@ -54,10 +60,8 @@ when the instance did not finish. What remains is a few milliseconds of process 
 overhead per instance, which is what the catalog's `test` benchmark exists to measure and
 subtract.
 
-The operands still travel from `prepare_instance` to `run_instance` through a `.mat` file,
-even though the warm daemon could keep them in memory. Reading them back is part of what
-the catalog asks a tool to do — read once, then repeat the operation — and doing it the
-same way in the daemon and in the direct fallback keeps the two paths comparable.
+Each job starts from `rng('default')`, so a warm daemon behaves like a fresh MATLAB and
+every run of an instance sees the same random inputs.
 
 If the server cannot be started, or its lease cannot be acquired, both scripts fall back
 to a direct `matlab -batch` run. That is far slower and its measurement includes MATLAB
@@ -77,8 +81,8 @@ clean restart.
 | `run_instance.sh` | submits the `run` job, copies out the verdict — the timed script |
 | `cora_server.sh` / `cora_server_lib.sh` | daemon supervisor and the clients' shared lease/wait logic |
 | `cora_server.m` | the daemon: reads jobs, dispatches, writes results |
-| `prepare_instance.m` | builds the operands and saves them |
-| `run_instance.m` | decides what is supported, reads the operands once, runs the operation `repetition` times, writes the verdict |
+| `prepare_instance.m` | initializes the GPU for gpu instances |
+| `run_instance.m` | decides what is supported, generates the inputs, runs the operation `repetition` times, writes the verdict |
 
 ## Configuration
 
@@ -95,7 +99,8 @@ clean restart.
 | `CORA_RUN_WAIT` | `3600` | backstop for a wedged daemon on a single instance |
 
 **Base image.** Anything Ubuntu-based with MATLAB and the Deep Learning / Optimization
-toolboxes CORA expects; `tobiasladnertum/cora:r2024b` is the image CORA's own submissions
+toolboxes CORA expects, plus the Parallel Computing Toolbox and the NVIDIA driver for the
+gpu instances; `tobiasladnertum/cora:r2024b` is the image CORA's own submissions
 use. The platform bootstraps it into an SSH-reachable node, so it needs `apt` and root at
 provisioning time. MATLAB must be licensed on the worker — a license server the node can
 reach, or a node-locked file via `CORA_LICENSE_URL`. `install_tool.sh` prints the worker's
@@ -107,7 +112,7 @@ against.
 With MATLAB and this repository's `code/cora` in place (`install_tool.sh v1` does that):
 
 ```bash
-P='{"set": "zonotope", "operation": "matMul", "dim": 100, "device": "cpu", "repetition": 100}'
+P='{"set": "zonotope", "operation": "matMul", "dim": 100, "generators": 200, "device": "cpu", "repetition": 100}'
 ./prepare_instance.sh v1 zonotope matMul-100d-cpu "$P"
 ./run_instance.sh     v1 zonotope matMul-100d-cpu "$P" /tmp/result.csv
 cat /tmp/result.csv
