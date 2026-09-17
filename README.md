@@ -80,6 +80,7 @@ clean restart.
 | `prepare_instance.sh` | brings the server up, submits the `prepare` job |
 | `run_instance.sh` | submits the `run` job, copies out the verdict — the timed script |
 | `cora_server.sh` / `cora_server_lib.sh` | daemon supervisor and the clients' shared lease/wait logic |
+| `cora_env.sh` | environment for everything that starts MATLAB (the license server) |
 | `cora_server.m` | the daemon: reads jobs, dispatches, writes results |
 | `prepare_instance.m` | initializes the GPU for gpu instances |
 | `run_instance.m` | decides what is supported, generates the inputs, runs the operation `repetition` times, writes the verdict |
@@ -93,7 +94,8 @@ clean restart.
 | `CORA_REF` | `v2026.1.0` | CORA tag to clone; pinned so a submission keeps meaning the same thing |
 | `CORA_REPO` | `https://github.com/TUMcps/CORA.git` | where to clone it from |
 | `CORA_MATLAB` | `matlab` | how to invoke MATLAB, e.g. `sudo -u matlab matlab` if the license belongs to another user |
-| `CORA_LICENSE_URL` | — | a license file to fetch and install; unset means the image reaches a license server |
+| `MLM_LICENSE_FILE` | `28000@mlm1.rbg.tum.de` | MATLAB's license server (TUM's by default) |
+| `CORA_LICENSE_URL` | — | a license file to fetch and install instead of using a license server |
 | `CORA_SERVER_DIR` | `$HOME/.cora_server` | the daemon's file channel |
 | `CORA_POLL` | `0.005` | client poll interval, inside the measured region |
 | `CORA_RUN_WAIT` | `3600` | backstop for a wedged daemon on a single instance |
@@ -102,8 +104,9 @@ clean restart.
 toolboxes CORA expects, plus the Parallel Computing Toolbox and the NVIDIA driver for the
 gpu instances; `tobiasladnertum/cora:r2024b` is the image CORA's own submissions
 use. The platform bootstraps it into an SSH-reachable node, so it needs `apt` and root at
-provisioning time. MATLAB must be licensed on the worker — a license server the node can
-reach, or a node-locked file via `CORA_LICENSE_URL`. `install_tool.sh` prints the worker's
+provisioning time. MATLAB checks its license out from TUM's license server
+(`MLM_LICENSE_FILE`), which a worker in the TUM network reaches; elsewhere, set your own
+server or a node-locked file via `CORA_LICENSE_URL`. `install_tool.sh` prints the worker's
 user and MAC addresses to the install log, which is what a node-locked license is issued
 against.
 

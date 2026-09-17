@@ -16,6 +16,7 @@ if [ "$1" != "$VERSION_STRING" ]; then
 fi
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/cora_env.sh"
 
 CORA_REPO="${CORA_REPO:-https://github.com/TUMcps/CORA.git}"
 CORA_REF="${CORA_REF:-v2026.1.0}"
@@ -29,7 +30,7 @@ echo "== licensing info =="
 echo "user: $(whoami)"
 ip link show 2>/dev/null || true
 
-# The image is expected to reach a license server. If the organizers hand out a license
+# MATLAB uses the license server from cora_env.sh. If the organizers hand out a license
 # file instead, point CORA_LICENSE_URL at it and it is installed here.
 if [ -n "${CORA_LICENSE_URL:-}" ]; then
     matlab_root="$(dirname "$(dirname "$(readlink -f "$(command -v "$MATLAB_BIN")")")")"
@@ -50,7 +51,7 @@ git -C "$CORA_DIR" rev-parse HEAD
 # ---------------------------------------------------------------- smoke test
 # Fail here rather than on the first instance: this is the one place where a broken
 # license or a missing toolbox is still attributable to the install step.
-echo "== checking MATLAB starts with CORA on the path =="
+echo "== checking MATLAB starts with CORA on the path (license: ${MLM_LICENSE_FILE:-license file}) =="
 "$MATLAB_BIN" -batch "addpath(genpath('$HERE')); \
     fprintf('%s\n', CORAVERSION); \
     Z = zonotope.generateRandom('Dimension', 2, 'NrGenerators', 2); \

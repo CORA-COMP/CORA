@@ -7,6 +7,8 @@
 # Reads:  CORA_SERVER_DIR, CORA_PING_TIMEOUT, CORA_POLL
 # Sets:   SRV_DIR, JOBID
 
+. "$(dirname "${BASH_SOURCE[0]}")/cora_env.sh"
+
 SRV_DIR="${CORA_SERVER_DIR:-${HOME}/.cora_server}"
 PING_TIMEOUT="${CORA_PING_TIMEOUT:-15}"
 
